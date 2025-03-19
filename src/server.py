@@ -2,14 +2,16 @@ import os
 import nltk
 import uvicorn
 from fastapi import FastAPI, Body, Depends
+import numpy as np
 from typing import List, Optional
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from lexical_retrieval import vectorize, preprocess_text
-from semantic_search import split_into_chunks
-from semantic_search import semantic_search
+from lexical_retrieval import vectorize, preprocess_text, search
+from semantic_search import semantic_search, split_into_chunks
+from metrics import evaluate_rankings
+from sklearn.metrics.pairwise import cosine_similarity
 
 TOP_K = 5
 
@@ -26,10 +28,15 @@ class ObjectLoader:
         if not hasattr(self, "initialized"):
             self.initialized = True
 
-    def load_objects(self, model, chunk_embeddings, chunks):
+    def load_objects(
+        self, model, chunk_embeddings, chunks, vectorizer, passages, tfidf_matrix
+    ):
         self.model = model
         self.chunk_embeddings = chunk_embeddings
         self.chunks = chunks
+        self.vectorizer = vectorizer
+        self.passages = passages
+        self.tfidf_matrix = tfidf_matrix
 
 
 # init object loader to dump elements at server startup
@@ -74,14 +81,20 @@ async def lifespan(app: FastAPI):
         with open("harry_potter.txt", "r", encoding="utf-8") as file:
             text = file.read()
 
-        model = SentenceTransformer("sentence-transformers/multi-qa-MiniLM-L6-cos-v1")
+        model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
         chunks = split_into_chunks(text)
         chunk_embeddings = model.encode(chunks)
+        vectorizer, passages = vectorize(text, TfidfVectorizer(), return_passages=True)
+        passages = chunks  # Use same 3-sentence chunks for both
+        tfidf_matrix = vectorizer.transform(passages)
         loader = ObjectLoader()
         loader.load_objects(
             model=model,
             chunk_embeddings=chunk_embeddings,
             chunks=chunks,
+            vectorizer=vectorizer,
+            passages=passages,
+            tfidf_matrix=tfidf_matrix,
         )
         yield
 
@@ -99,6 +112,8 @@ async def root():
         "message": "Harry Potter Search API",
         "endpoints": {
             "/search/semantic": "Semantic search using sentence-transformers",
+            "/search/tfidf": "TF-IDF search using sklearn",
+            "/compare_methods": "Compare the results of the semantic and tfidf search methods",
         },
     }
 
@@ -136,6 +151,71 @@ async def semantic_search_endpoint(
         ],
         search_type="semantic",
     )
+
+
+async def tfidf_endpoint(
+    q: str = Body(..., description="Search query"),
+    top_k: Optional[int] = Body(TOP_K, description="Number of results to return"),
+    loader: ObjectLoader = Depends(get_loader),
+):
+    """
+    Perform semantic search using sentence-transformers
+
+    This endpoint uses the multi-qa-MiniLM-L6-cos-v1 model to find semantically
+    similar passages in the Harry Potter text.
+    """
+    vectorizer = loader.vectorizer
+    passages = loader.passages
+    tfidf_matrix = loader.tfidf_matrix
+    print("tfidf_matrix", tfidf_matrix)
+    results = search(
+        query=q,
+        top_k=int(top_k),
+        vectorizer=vectorizer,
+        tfidf_matrix=tfidf_matrix,
+        passages=passages,
+    )
+
+    # Convert results to the response model format
+    return SearchResponse(
+        query=q,
+        results=[
+            SearchResult(passage=r["passage"], score=float(r["score"])) for r in results
+        ],
+        search_type="tfidf",
+    )
+
+
+@app.post("/compare_methods")
+async def compare_method_endpoints(
+    q: str = Body(..., description="Search query"),
+    top_k: Optional[int] = Body(TOP_K, description="Number of results to return"),
+    loader: ObjectLoader = Depends(get_loader),
+):
+    """
+    Compare the results of the semantic and tfidf search methods
+    """
+    passages = loader.passages
+    semantic_results = await semantic_search_endpoint(q, top_k, loader)
+    semantic_results = semantic_results.results
+    tfidf_results = await tfidf_endpoint(q, top_k, loader)
+    tfidf_results = tfidf_results.results
+    # Create binary relevance vector for all passages
+    semantic_embeddings = loader.chunk_embeddings
+    tfidf_embeddings = loader.model.encode(passages)
+
+    # Calculate pairwise similarities
+    similarity_matrix = cosine_similarity(tfidf_embeddings, semantic_embeddings)
+    y_true = (np.max(similarity_matrix, axis=1) > 0.65).astype(int)
+
+    # Evaluate using our metrics
+    metrics = evaluate_rankings(y_true, tfidf_results, [top_k])
+
+    return {
+        "semantic_results": semantic_results,
+        "tfidf_results": tfidf_results,
+        "metrics": metrics,
+    }
 
 
 if __name__ == "__main__":

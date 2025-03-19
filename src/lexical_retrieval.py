@@ -1,5 +1,3 @@
-# load
-# Load and preprocess the Harry Potter text
 import re
 import numpy as np
 import pandas as pd
@@ -22,7 +20,7 @@ def preprocess(text):
 
 
 # Function to search for relevant passages
-def search(query, vectorizer, passages, top_k=5):
+def search(query, vectorizer, passages, tfidf_matrix, top_k=5):
     # Preprocess the query
     preprocessed_query = preprocess(query)
     # Transform the query to TF-IDF vector
@@ -40,21 +38,24 @@ def search(query, vectorizer, passages, top_k=5):
 
 def preprocess_text(text):
     passages = sent_tokenize(text)
-    preprocessed_passages = [preprocess(passage) for passage in passages]
+    preprocessed_passages = list(set([preprocess(passage) for passage in passages]))
     return preprocessed_passages
 
 
-def vectorize(text, vectorizer):
+def vectorize(text, vectorizer, return_passages=False):
     preprocessed_passages = preprocess_text(text)
     # Create TF-IDF vectors
-    tfidf_matrix = vectorizer.fit_transform(preprocessed_passages)
-    return tfidf_matrix
+    vectorizer.fit(preprocessed_passages)
+    if return_passages:
+        return vectorizer, preprocessed_passages
+    return vectorizer
 
 
-if __name__ == "__main__ ":
     # Example: Search for a query and display the top 5 passages
 
-    # Download necessary NLTK data
+# Download necessary NLTK data
+if __name__ == "__main__":
+    print("Downloading NLTK data")
     nltk.download("punkt")
     nltk.download("punkt_tab")
     # Load the text file
@@ -62,7 +63,8 @@ if __name__ == "__main__ ":
         text = file.read()
 
     vectorizer = TfidfVectorizer(stop_words="english")
-    tfidf_matrix = vectorize(text, vectorizer)
+    vectorizer = vectorize(text, vectorizer)
+    tfidf_matrix = vectorizer.transform(preprocess_text(text))
     QUERY1 = "magic wand"
     QUERY2 = "Harry be careful!"
     QUERY3 = "Voldemort is here"
@@ -71,5 +73,6 @@ if __name__ == "__main__ ":
         search_fn=search,
         top_k=5,
         vectorizer=vectorizer,
-        passages=prek,
+        passages=preprocess_text(text),
+        tfidf_matrix=tfidf_matrix,
     )

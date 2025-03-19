@@ -278,7 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("--from_cache", type=str, default=None)
     args = parser.parse_args()
     # Load the sentence transformer model
-    model = SentenceTransformer("sentence-transformers/multi-qa-MiniLM-L6-cos-v1")
+    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     if not args.from_cache:
         # Load the text file
         with open("harry_potter.txt", "r", encoding="utf-8") as file:
@@ -307,4 +307,4 @@ if __name__ == "__main__":
     QUERY1 = "magic wand"
     QUERY2 = "Harry be careful!"
     QUERY3 = "Voldemort is here"
-    search_queries(queries=[QUERY1, QUERY2, QUERY3], search_fn=semantic_search, top_k=5)
+    search_queries(queries=[QUERY1, QUERY2, QUERY3], search_fn=semantic_search, model=model, chunk_embeddings=chunk_embeddings, chunks=chunks, top_k=5)
