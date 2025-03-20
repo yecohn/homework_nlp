@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    volumes:
+      - ./src/harry_potter.txt:/app/harry_potter.txt
+      - ./src/cached_embedding.pkl:/app/cached_embedding.pkl
+    environment:
+      - PORT=8000
+      - PORT_STREAMLIT=8501
+      - HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 5s
