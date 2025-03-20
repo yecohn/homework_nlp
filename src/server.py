@@ -151,7 +151,9 @@ async def semantic_search_endpoint(
         search_type="semantic",
     )
 
-
+@app.post(
+    "/search/tfidf",
+)
 async def tfidf_endpoint(
     q: str = Body(..., description="Search query"),
     top_k: Optional[int] = Body(TOP_K, description="Number of results to return"),

@@ -15,7 +15,7 @@ def search_text(
     """
     Send search request to FastAPI server
     """
-    url = "http://localhost:8000/search/{method}"
+    url = f"http://localhost:8000/search/{method}"
 
     # Prepare the request payload
     payload = {"q": query, "top_k": top_k}

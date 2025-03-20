@@ -10,7 +10,7 @@ kill_existing() {
 # Function to cleanup child processes on exit
 cleanup() {
     echo "Shutting down services..."
-    kill $(jobs -p)
+    kill "$(jobs -p)"
     exit
 }
 
