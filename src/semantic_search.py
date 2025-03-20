@@ -293,10 +293,11 @@ if __name__ == "__main__":
         # Generate embeddings for all chunks
         chunk_embeddings = model.encode(chunks)
         if args.cache_chunks:
-            pickle.dump(chunk_embeddings, "cached_embedding.pkl")
+            with open("cached_embedding.pkl", "wb") as f:
+                pickle.dump((chunks, chunk_embeddings), f)
     else:
-        with open(args.from_cache, "rb") as f:
-            chunk_embeddings = pickle.load(f)
+        with open("cached_embedding.pkl", "rb") as f:
+            chunks, chunk_embeddings = pickle.load(f)
 
     if args.plot:
         visualize_embeddings()
@@ -307,4 +308,11 @@ if __name__ == "__main__":
     QUERY1 = "magic wand"
     QUERY2 = "Harry be careful!"
     QUERY3 = "Voldemort is here"
-    search_queries(queries=[QUERY1, QUERY2, QUERY3], search_fn=semantic_search, model=model, chunk_embeddings=chunk_embeddings, chunks=chunks, top_k=5)
+    search_queries(
+        queries=[QUERY1, QUERY2, QUERY3],
+        search_fn=semantic_search,
+        model=model,
+        chunk_embeddings=chunk_embeddings,
+        chunks=chunks,
+        top_k=5,
+    )

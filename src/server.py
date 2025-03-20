@@ -11,7 +11,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from lexical_retrieval import vectorize, preprocess_text, search
 from semantic_search import semantic_search, split_into_chunks
 from metrics import evaluate_rankings
-from sklearn.metrics.pairwise import cosine_similarity
 
 TOP_K = 5
 
@@ -167,7 +166,6 @@ async def tfidf_endpoint(
     vectorizer = loader.vectorizer
     passages = loader.passages
     tfidf_matrix = loader.tfidf_matrix
-    print("tfidf_matrix", tfidf_matrix)
     results = search(
         query=q,
         top_k=int(top_k),
@@ -195,21 +193,15 @@ async def compare_method_endpoints(
     """
     Compare the results of the semantic and tfidf search methods
     """
-    passages = loader.passages
     semantic_results = await semantic_search_endpoint(q, top_k, loader)
     semantic_results = semantic_results.results
     tfidf_results = await tfidf_endpoint(q, top_k, loader)
     tfidf_results = tfidf_results.results
-    # Create binary relevance vector for all passages
-    semantic_embeddings = loader.chunk_embeddings
-    tfidf_embeddings = loader.model.encode(passages)
-
-    # Calculate pairwise similarities
-    similarity_matrix = cosine_similarity(tfidf_embeddings, semantic_embeddings)
-    y_true = (np.max(similarity_matrix, axis=1) > 0.65).astype(int)
-
+    relevant_passages = set([result.passage for result in semantic_results])
+    y_true = [1 if result.passage in relevant_passages else 0 for result in semantic_results]
+    y_pred = [result.score for result in tfidf_results]
     # Evaluate using our metrics
-    metrics = evaluate_rankings(y_true, tfidf_results, [top_k])
+    metrics = evaluate_rankings(y_true, y_pred, [top_k])
 
     return {
         "semantic_results": semantic_results,

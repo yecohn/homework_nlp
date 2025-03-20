@@ -10,9 +10,7 @@ from sklearn.metrics import (
 )
 
 
-def evaluate_rankings(
-    y_true: np.ndarray, y_pred_scores: np.ndarray, k_values: List[int] = [5]
-) -> Dict:
+def evaluate_rankings(y_true, y_pred, k_values: List[int] = [5]) -> Dict:
     """
         Evaluate rankings using multiple sklearn metrics
 
@@ -25,7 +23,7 @@ def evaluate_rankings(
             Dictionary containing all metrics
     """
     # Sort predictions and get indices
-    sorted_indices = np.argsort(y_pred_scores)[::-1]  # Descending order
+    sorted_indices = np.argsort(y_pred)[::-1]  # Descending order
     y_true_sorted = y_true[sorted_indices]
 
     metrics = {}
@@ -45,12 +43,12 @@ def evaluate_rankings(
         metrics[f"R@{k}"] = r_at_k
 
     # Calculate AUC-ROC
-    metrics["AUC-ROC"] = roc_auc_score(y_true, y_pred_scores)
+    metrics["AUC-ROC"] = roc_auc_score(y_true, y_pred)
 
     # Calculate AUC-PR (Area under Precision-Recall curve)
-    precision, recall, _ = precision_recall_curve(y_true, y_pred_scores)
+    precision, recall, _ = precision_recall_curve(y_true, y_pred)
     metrics["AUC-PR"] = auc(recall, precision)
 
     # Average Precision
-    metrics["AP"] = average_precision_score(y_true, y_pred_scores)
+    metrics["AP"] = average_precision_score(y_true, y_pred)
     return metrics
